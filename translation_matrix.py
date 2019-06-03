@@ -3,15 +3,17 @@
 
 from gensim import utils
 import numpy as np
-import gensim
+# import gensim
 import gensim.models.fasttext as fasttext
 
 """
-Produce translation matrix to translate the word from one language to another language, using either
-standard nearest neighbour method or globally corrected neighbour retrieval method [1].
-This method can be used to augment the existing phrase tables with more candidate translations, or
-filter out errors from the translation tables and known dictionaries [2]. What's more, It also work
-for any two sets of named-vectors where there are some paired-guideposts to learn the transformation.
+Produce translation matrix to translate the word from one language to another
+language, using either standard nearest neighbour method or globally corrected
+neighbour retrieval method [1]. This method can be used to augment the existing
+phrase tables with more candidate translations, or filter out errors from the
+translation tables and known dictionaries [2]. What's more, It also work for
+any two sets of named-vectors where there are some paired-guideposts to learn
+the transformation.
 """
 
 
@@ -21,10 +23,11 @@ def normalize(mat):
 
 
 class TranslationMatrix(object):
-    def __init__(self, src_model, tgt_model, word_pairs=None, random_state=None):
+    def __init__(self, src_model, tgt_model, word_pairs=None,
+                 random_state=None):
         """
-        Initialize the model from a list pair of `word_pair`. Each word_pair is tupe
-         with source language word and target language word.
+        Initialize the model from a list pair of `word_pair`. Each word_pair is
+        tupe with source language word and target language word.
         Examples: [("one", "uno"), ("two", "due")]
         Args:
             `word_pair` (list): a list pair of words
@@ -48,17 +51,19 @@ class TranslationMatrix(object):
 
         if word_pairs is not None:
             if len(word_pairs[0]) != 2:
-                raise ValueError("Each training data item must contain two different language words.")
+                raise ValueError("Each training data item must contain two \
+                                 different language words.")
             self.train(word_pairs)
-
 
     def train(self, word_pair):
         """
-        Build the translation matrix that mapping from source space to target space.
+        Build the translation matrix that mapping from source space to target
+        space.
         Args:
             `word_pairs` (list): a list pair of words
         Returns:
-            `translation matrix` that mapping from the source language to target language
+            `translation matrix` that mapping from the source language to
+            target language
         """
         self.src_word, self.tgt_word = zip(*word_pair)
 
@@ -69,21 +74,35 @@ class TranslationMatrix(object):
 
     def apply_transmat(self):
         """
-        Map the target word model to the source word model using translation matrix
+        Map the target word model to the source word model using translation
+        matrix
         Returns:
             A `Word2Vec` object with the translated matrix
         """
-        new_mat = np.dot(self.tgt_model.wv.vectors_norm, self.translation_matrix)
+        new_mat = np.dot(self.tgt_model.wv.vectors_norm,
+                         self.translation_matrix)
         self.tgt_model.wv.vectors_norm = new_mat
-        if isinstance(tgt_model, FastText):
-            new_mat_ngram = np.dot(self.tgt_model.wv.vectors_ngrams_norm, self.translation_matrix)
+        if isinstance(self.tgt_model, fasttext.FastText):
+            new_mat_ngram = np.dot(self.tgt_model.wv.vectors_ngrams_norm,
+                                   self.translation_matrix)
             self.tgt_model.wv.vectors_ngrams_norm = new_mat_ngram
 
 
+def get_nn(word, src_model, tgt_model, K=5):
+    word_emb = src_model.wv[word]
+    tgt_emb = tgt_model.wv.vectors_norm
+    scores = (tgt_emb / np.linalg.norm(tgt_emb, 2, 1)[:, None]) \
+              .dot(word_emb / np.linalg.norm(word_emb))
+
+    k_best = scores.argsort()[-K:][::-1]
+    for i, idx in enumerate(k_best):
+        print('%.4f - %s' % (scores[idx], tgt_model.wv.index2entity[idx]))
+
+
 if __name__ == '__main__':
-    en_path = '/home/valnyz/PhD/en_cbow_model_4_6'
-    fr_path = '/home/valnyz/PhD/fr_cbow_model_4_6'
-    pair_file = '/home/valnyz/python/MUSE/data/crosslingual/dictionaries/fr-en.txt'
+    en_path = '/home/valnyz/data/en_skipgram'
+    fr_path = '/home/valnyz/data/fr_skipgram'
+    pair_file = '/home/valnyz/data/fr-en.txt'
 
     # en_model = fasttext.load_facebook_vectors(en_path + '.bin')
     en_model = fasttext.load_facebook_model(en_path + '.bin')
@@ -106,11 +125,8 @@ if __name__ == '__main__':
           transmat.translation_matrix.shape)
 
     # translation the word
-    words = [('one', 'un'), ('two', 'deux'), ('three', 'trois'), ('four',
-                                                                  'quatre'), ('five', 'cinq')]
-    source_word, target_word = zip(*words)
-    translated_word = transmat.translate(source_word, 5)
-    print(translated_word)
+    words = [('one', 'un'), ('two', 'deux'), ('three', 'trois'),
+             ('four', 'quatre'), ('five', 'cinq')]
+    transmat.apply_transmat()
 
-
-
+    get_nn('parlement', en_model, fr_model)
